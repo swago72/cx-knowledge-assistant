@@ -24,9 +24,9 @@ def load_html_files(folder_path="data/html"):
         for tag in soup(["script", "style", "nav", "header", "footer", "aside", "noscript", "iframe"]):
             tag.decompose()
 
-        clean_text = soup.get_text(separator="\n", strip=True)
+        clean_text = soup.get_text(separator="\\n", strip=True)
         lines = [l for l in clean_text.splitlines() if l.strip()]
-        clean_text = "\n".join(lines)
+        clean_text = "\\n".join(lines)
 
         if len(clean_text) < 100:
             print(f"  ⚠ Skipping {filename} — too short")
@@ -42,14 +42,14 @@ def load_html_files(folder_path="data/html"):
         })
         print(f"  ✓ {short_name} ({len(clean_text):,} chars)")
 
-    print(f"\nTotal documents loaded: {len(documents)}")
+    print(f"\\nTotal documents loaded: {len(documents)}")
     return documents
 
 def chunk_documents(documents):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
         chunk_overlap=50,
-        separators=["\n\n", "\n", ".", " "]
+        separators=["\\n\\n", "\\n", ".", " "]
     )
 
     chunks = []
@@ -71,7 +71,7 @@ def chunk_documents(documents):
 def embed_and_store(chunks, collection_name="cx_knowledge_base"):
     print("Loading HuggingFace model (downloads once)...")
     model = SentenceTransformer("all-MiniLM-L6-v2")
-    print("✓ Model ready\n")
+    print("✓ Model ready\\n")
 
     client = chromadb.PersistentClient(path="./chroma_db")
     collection = client.get_or_create_collection(
@@ -79,8 +79,7 @@ def embed_and_store(chunks, collection_name="cx_knowledge_base"):
         metadata={"hnsw:space": "cosine"}
     )
 
-    # Avoid duplicates
-    existing = collection.get(include=[])  # faster
+    existing = collection.get(include=[])
     existing_ids = set(existing["ids"]) if existing and "ids" in existing else set()
 
     new_chunks = [c for c in chunks if c["chunk_id"] not in existing_ids]
@@ -111,24 +110,24 @@ def embed_and_store(chunks, collection_name="cx_knowledge_base"):
         done = min(i + batch_size, len(new_chunks))
         print(f"  Stored {done}/{len(new_chunks)}")
 
-    print(f"\n✓ ChromaDB contains {collection.count()} total chunks")
+    print(f"\\n✓ ChromaDB contains {collection.count()} total chunks")
     return collection, model
 
 def main():
     print("=" * 55)
     print("  CX Knowledge Assistant — Ingestion Pipeline")
-    print("=" * 55 + "\n")
+    print("=" * 55 + "\\n")
 
     print("STEP 1: Loading HTML files...")
     documents = load_html_files()
 
-    print("\nSTEP 2: Chunking...")
+    print("\\nSTEP 2: Chunking...")
     chunks = chunk_documents(documents)
 
-    print("\nSTEP 3: Embedding and storing in ChromaDB...")
+    print("\\nSTEP 3: Embedding and storing in ChromaDB...")
     embed_and_store(chunks)
 
-    print("\n✅ Done. Knowledge base is ready for Week 2.")
+    print("\\n✅ Done. Knowledge base is ready for Week 2.")
 
 if __name__ == "__main__":
     main()
