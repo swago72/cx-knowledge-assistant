@@ -1,0 +1,10 @@
+langchain
+langchain-text-splitters
+langchain-google-genai
+chromadb
+sentence-transformers
+beautifulsoup4
+lxml
+streamlit
+pandas
+python-dotenv
