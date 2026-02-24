@@ -1,6 +1,7 @@
-.env
-chroma_db/
-data/html/
-__pycache__/
-*.pyc
-.ipynb_checkpoints/
+# analytics db
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# keep the folder
+!data/.gitkeep
