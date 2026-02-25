@@ -1,7 +1,42 @@
-# analytics db
+# =========================
+# Environment & Secrets
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# Virtual Environment
+# =========================
+.venv/
+venv/
+env/
+
+# =========================
+# Python Cache
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.cache
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Chroma Vector DB
+# =========================
+chroma_db/
+
+# =========================
+# SQLite Analytics DB
+# =========================
 data/*.db
 data/*.sqlite
 data/*.sqlite3
 
-# keep the folder
+# Keep folder structure
 !data/.gitkeep
