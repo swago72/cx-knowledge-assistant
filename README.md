@@ -17,7 +17,7 @@ An AI-powered RAG chatbot that lets support agents query documentation using pla
 
 ## Status
 - [x] Week 1: Ingestion pipeline
-- [ ] Week 2: RAG + Gemini
+- [x] Week 2: RAG + Gemini
 - [ ] Week 3: Analytics
 - [ ] Week 4: Streamlit UI
 - [ ] Week 5: Polish
