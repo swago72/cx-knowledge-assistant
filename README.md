@@ -1,18 +1,46 @@
-# CX Knowledge Assistant
+# CX Knowledge Assistant — Production-Safe RAG System
 
-An AI-powered RAG chatbot that lets support agents query documentation using plain English and get cited answers.
+LLM-powered customer support assistant built with a production-oriented Retrieval-Augmented Generation (RAG) architecture.
+
+This system ingests structured HTML knowledge base articles, builds a persistent vector store, retrieves semantically relevant content using embeddings, and generates strictly source-grounded responses with citation enforcement and fallback protection.
+
+## Architecture Overview
+
+## Ingestion Layer
+- HTML cleaning and normalization (BeautifulSoup)
+- Recursive chunking (500 token windows with overlap)
+- SentenceTransformer embeddings (all-MiniLM-L6-v2)
+- Persistent ChromaDB vector storage
+## Retrieval Layer
+- Cosine similarity search with distance diagnostics 
+- Top-k retrieval with metadata tracking
+- Debug metrics (distance, hit previews, chunk counts)
+## Generation Layer
+- Gemini 2.5 Pro (via LangChain)
+- Strict source-only answering
+- Citation enforcement
+- Confidence-based fallback logic
+## Analytics Layer (WIP)
+- SQLite query logging
+- Latency tracking
+- Similarity scoring
+
 
 ## Stack
+- Python 3.11
 - LLM: Google Gemini (via LangChain)
-- Embeddings: HuggingFace all-MiniLM-L6-v2
-- Vector DB: ChromaDB
-- Orchestration: LangChain
+- Sentence Transformers
+- ChromaDB
+- BeautifulSoup
+- SQLite
 - UI: Streamlit
+
 
 ## Setup
     pip install -r requirements.txt
-    # Add GOOGLE_API_KEY to .env
-    python src/ingestion.py
+    # Create .env Add GOOGLE_API_KEY
+    python -m src/ingestion
+    python -m src/run_one
     streamlit run app.py
 
 ## Status
