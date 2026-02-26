@@ -435,3 +435,26 @@ if __name__ == "__main__":
         print("\n" + "=" * 80)
         print(name)
         print(df.head(20).to_string(index=False))
+
+
+
+
+
+def containment_metrics(db_path=DEFAULT_DB_PATH):
+    df = fetch_logs(db_path=db_path, limit=200000)
+    if df.empty:
+        return {}
+
+    states = df["extra"].apply(lambda x: x.get("state") if isinstance(x, dict) else None)
+
+    total = len(states)
+    answer = (states == "ANSWER").sum()
+    clarify = (states == "CLARIFY").sum()
+    handoff = (states == "HANDOFF").sum()
+
+    return {
+        "total": total,
+        "containment_rate": round(answer / total, 3) if total else 0,
+        "clarify_rate": round(clarify / total, 3) if total else 0,
+        "handoff_rate": round(handoff / total, 3) if total else 0,
+    }
