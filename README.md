@@ -6,6 +6,32 @@ This system ingests structured HTML knowledge base articles, builds a persistent
 
 ## Architecture Overview
 
+## System Design Evolution
+
+### V1 — Enterprise Modular Architecture
+- FastAPI backend
+- OpenAI GPT-3.5
+- LangChain RAG
+- SQLite → PostgreSQL upgrade path
+- Full ingestion + analytics layer
+
+Designed for enterprise CCaaS deployment.
+
+[View Architecture v1](docs/01_mvp_enterprise_architecture.html)
+
+---
+
+### V2 — Simplified Cost-Optimized Stack
+- Gemini 2.0 Flash (Free tier)
+- HuggingFace local embeddings
+- No FastAPI layer
+- Fully Streamlit-based app
+- Reduced infra complexity
+
+Designed for fast deployment + zero-cost scalability.
+
+[View Architecture v2](docs/02_cost_optimized_gemini_architecture.html)
+
 ## Ingestion Layer
 - HTML cleaning and normalization (BeautifulSoup)
 - Recursive chunking (500 token windows with overlap)
