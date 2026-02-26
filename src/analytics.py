@@ -16,7 +16,8 @@ import pandas as pd
 # -----------------------------
 # Config
 # -----------------------------
-DEFAULT_DB_PATH = Path("data") / "analytics.db"
+from src.config import get_settings
+DEFAULT_DB_PATH = get_settings().analytics_db_path
 
 # Define a canonical "no answer" string so gap detection is consistent.
 NO_CONFIDENT_ANSWER = "couldn't find confident answer"

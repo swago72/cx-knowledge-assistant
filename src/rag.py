@@ -5,8 +5,7 @@ from typing import List, Dict, Any, Tuple
 import chromadb
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from dotenv import load_dotenv
-load_dotenv()
+from src.config import get_settings
 
 from src.analytics import log_query, NO_CONFIDENT_ANSWER
 
@@ -139,9 +138,8 @@ def generate_answer(
     model_name: str = "models/gemini-2.5-pro",
     temperature: float = 0.2,
 ) -> str:
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing GOOGLE_API_KEY in environment.")
+    settings = get_settings()
+    api_key = settings.google_api_key
 
     llm = ChatGoogleGenerativeAI(
         model=model_name,
