@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CX Knowledge Assistant — System Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 64px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 40px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    font-family: 'Space Mono', monospace;
+    max-width: 600px;
+    line-height: 1.6;
+  }
+
+  /* Section titles */
+  .section {
+    margin-bottom: 56px;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 24px;
+  }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .arch-diagram::before {
+    content: 'SYSTEM ARCHITECTURE';
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--border);
+    letter-spacing: 3px;
+  }
+
+  .arch-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .arch-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .arch-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    min-width: 140px;
+    text-align: center;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .arch-node:hover {
+    border-color: var(--accent);
+  }
+
+  .arch-node .node-icon {
+    font-size: 22px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .arch-node .node-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .arch-node .node-tech {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .arch-node.accent { border-color: var(--accent); }
+  .arch-node.accent2 { border-color: var(--accent2); }
+  .arch-node.accent3 { border-color: var(--accent3); }
+  .arch-node.accent4 { border-color: var(--accent4); }
+
+  .arch-node.accent .node-icon { filter: drop-shadow(0 0 8px var(--accent)); }
+  .arch-node.accent2 .node-icon { filter: drop-shadow(0 0 8px var(--accent2)); }
+  .arch-node.accent3 .node-icon { filter: drop-shadow(0 0 8px var(--accent3)); }
+  .arch-node.accent4 .node-icon { filter: drop-shadow(0 0 8px var(--accent4)); }
+
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+    color: var(--muted);
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .arch-arrow .arrow-line {
+    width: 2px;
+    height: 30px;
+    background: linear-gradient(to bottom, var(--border), var(--accent));
+    position: relative;
+  }
+
+  .arch-arrow .arrow-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .arch-arrow-h {
+    width: 40px;
+    height: 2px;
+    background: linear-gradient(to right, var(--border), var(--accent));
+    flex-shrink: 0;
+  }
+
+  /* Components grid */
+  .components-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2px;
+    background: var(--border);
+  }
+
+  .component-card {
+    background: var(--surface);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .component-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+  }
+
+  .component-card.c1::before { background: var(--accent); }
+  .component-card.c2::before { background: var(--accent2); }
+  .component-card.c3::before { background: var(--accent3); }
+  .component-card.c4::before { background: var(--accent4); }
+  .component-card.c5::before { background: var(--danger); }
+  .component-card.c6::before { background: #ec4899; }
+
+  .component-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .component-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .component-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .tech-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tech-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tech-tag.highlight {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Data flow */
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    background: var(--surface);
+    padding: 20px 24px;
+    border-left: 3px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .flow-step:hover {
+    border-color: var(--accent);
+  }
+
+  .flow-step-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--border);
+    min-width: 40px;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .flow-step:hover .flow-step-num {
+    color: var(--accent);
+  }
+
+  .flow-step-content .step-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .flow-step-content .step-desc {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    line-height: 1.6;
+  }
+
+  .flow-step-content .step-tech {
+    margin-top: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+  }
+
+  /* Stack table */
+  .stack-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+  }
+
+  .stack-table th {
+    text-align: left;
+    padding: 12px 16px;
+    color: var(--accent);
+    font-size: 10px;
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .stack-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .stack-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .stack-table tr:hover td {
+    background: var(--surface2);
+  }
+
+  .stack-table .layer {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .stack-table .tool {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .stack-table .reason {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .stack-table .cost {
+    color: var(--accent3);
+  }
+
+  /* Week timeline */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2), var(--accent3), var(--accent4), var(--accent), var(--accent2));
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 24px;
+    background: var(--surface);
+    padding: 20px 24px;
+  }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 24px;
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    transform: rotate(45deg);
+  }
+
+  .week-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .week-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .week-tasks {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .week-tasks li {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding-left: 16px;
+    position: relative;
+    line-height: 1.5;
+  }
+
+  .week-tasks li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+
+  /* Folder structure */
+  .folder-tree {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    line-height: 2;
+  }
+
+  .folder-tree .dir { color: var(--accent); }
+  .folder-tree .file { color: var(--text); }
+  .folder-tree .comment { color: var(--muted); }
+
+  /* RAG flow visual */
+  .rag-visual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+  }
+
+  .rag-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .rag-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    text-align: center;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .rag-box.highlight {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .rag-box.highlight2 {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .rag-box.highlight3 {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+
+  .rag-arrow {
+    color: var(--muted);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: gap;
+    gap: 16px;
+  }
+
+  .footer-left {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .footer-right {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  @media (max-width: 600px) {
+    .arch-row { flex-direction: column; }
+    .rag-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">Portfolio Project · System Design v1.0</div>
+    <h1>CX Knowledge <span>Assistant</span></h1>
+    <p class="subtitle">An AI-powered RAG system that lets call center agents query SOPs and knowledge base documents using plain English — and get cited, accurate answers in real time.</p>
+  </div>
+
+  <!-- Architecture Overview -->
+  <div class="section">
+    <div class="section-label">01 — Architecture</div>
+    <div class="section-title">High-Level System Architecture</div>
+
+    <div class="arch-diagram">
+      <div class="arch-flow">
+
+        <!-- User Layer -->
+        <div class="arch-row">
+          <div class="arch-node accent">
+            <span class="node-icon">👤</span>
+            <div class="node-title">Agent / Supervisor</div>
+            <div class="node-tech">End User</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">HTTP Request</div>
+          <div class="arch-arrow-line"></div>
+        </div>
+
+        <!-- Frontend -->
+        <div class="arch-row">
+          <div class="arch-node accent4">
+            <span class="node-icon">🖥️</span>
+            <div class="node-title">Frontend UI</div>
+            <div class="node-tech">Streamlit</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">API Call</div>
+          <div class="arch-arrow-line"></div>
+        </div>
+
+        <!-- Backend -->
+        <div class="arch-row" style="gap:2px; justify-content:center;">
+          <div class="arch-node accent2" style="min-width:160px;">
+            <span class="node-icon">⚙️</span>
+            <div class="node-title">Query Engine</div>
+            <div class="node-tech">FastAPI + LangChain</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent2" style="min-width:160px;">
+            <span class="node-icon">🧠</span>
+            <div class="node-title">LLM Layer</div>
+            <div class="node-tech">OpenAI GPT-3.5</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent2" style="min-width:160px;">
+            <span class="node-icon">📊</span>
+            <div class="node-title">Analytics Layer</div>
+            <div class="node-tech">SQLite + Streamlit</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">Vector Search</div>
+          <div class="arch-arrow-line"></div>
+        </div>
+
+        <!-- Data Layer -->
+        <div class="arch-row" style="gap:2px; justify-content:center;">
+          <div class="arch-node accent3" style="min-width:160px;">
+            <span class="node-icon">🗄️</span>
+            <div class="node-title">Vector Store</div>
+            <div class="node-tech">ChromaDB</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent3" style="min-width:160px;">
+            <span class="node-icon">📄</span>
+            <div class="node-title">Document Store</div>
+            <div class="node-tech">Local PDF/DOCX</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent3" style="min-width:160px;">
+            <span class="node-icon">💾</span>
+            <div class="node-title">Query Logs DB</div>
+            <div class="node-tech">PostgreSQL / SQLite</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- RAG Flow -->
+  <div class="section">
+    <div class="section-label">02 — Core Logic</div>
+    <div class="section-title">RAG Pipeline — How a Query Flows</div>
+
+    <div class="rag-visual">
+      <div class="rag-row">
+        <div class="rag-box highlight">User Types Question</div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight">Embed Question<br><span style="font-size:9px;opacity:0.6">text-embedding-ada-002</span></div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight">Vector Search<br><span style="font-size:9px;opacity:0.6">ChromaDB cosine similarity</span></div>
+      </div>
+      <div class="rag-row" style="justify-content:flex-end;">
+        <div class="rag-arrow" style="transform:rotate(90deg);">→</div>
+      </div>
+      <div class="rag-row" style="flex-direction:row-reverse;">
+        <div class="rag-box highlight2">Return Answer + Citations</div>
+        <div class="rag-arrow">←</div>
+        <div class="rag-box highlight2">GPT-3.5 Generates Answer<br><span style="font-size:9px;opacity:0.6">constrained to retrieved chunks</span></div>
+        <div class="rag-arrow">←</div>
+        <div class="rag-box highlight2">Top 5 Chunks Retrieved<br><span style="font-size:9px;opacity:0.6">with source metadata</span></div>
+      </div>
+      <div class="rag-row" style="justify-content:flex-start;">
+        <div class="rag-arrow" style="transform:rotate(90deg);">→</div>
+      </div>
+      <div class="rag-row">
+        <div class="rag-box highlight3">Log Query to DB</div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight3">Update Analytics Dashboard</div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight3">Surface Knowledge Gaps</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 Components -->
+  <div class="section">
+    <div class="section-label">03 — Components</div>
+    <div class="section-title">6 Core System Components</div>
+
+    <div class="components-grid">
+      <div class="component-card c1">
+        <div class="component-num">COMPONENT 01</div>
+        <div class="component-name">Document Ingestion Pipeline</div>
+        <div class="component-desc">Reads PDFs and Word docs, chunks them into 500-token segments with overlap, generates vector embeddings, and stores them in ChromaDB with source metadata.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">LangChain</span>
+          <span class="tech-tag highlight">PyPDF2</span>
+          <span class="tech-tag">python-docx</span>
+          <span class="tech-tag">OpenAI Embeddings</span>
+          <span class="tech-tag">ChromaDB</span>
+        </div>
+      </div>
+
+      <div class="component-card c2">
+        <div class="component-num">COMPONENT 02</div>
+        <div class="component-name">RAG Query Engine</div>
+        <div class="component-desc">Embeds user questions, performs semantic search against vector store, retrieves top-k relevant chunks, and passes them to the LLM with a strict citation-enforcing prompt.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">LangChain RAG</span>
+          <span class="tech-tag highlight">GPT-3.5-turbo</span>
+          <span class="tech-tag">Prompt Engineering</span>
+          <span class="tech-tag">FastAPI</span>
+        </div>
+      </div>
+
+      <div class="component-card c3">
+        <div class="component-num">COMPONENT 03</div>
+        <div class="component-name">Conversational Memory</div>
+        <div class="component-desc">Maintains context across multi-turn conversations so agents can ask follow-up questions without re-explaining. Uses a sliding window buffer to stay within token limits.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">ConversationBufferMemory</span>
+          <span class="tech-tag">LangChain</span>
+          <span class="tech-tag">Token Management</span>
+        </div>
+      </div>
+
+      <div class="component-card c4">
+        <div class="component-num">COMPONENT 04</div>
+        <div class="component-name">Chat UI + Citation Panel</div>
+        <div class="component-desc">Clean agent-facing chat interface with a source citation panel showing exactly which SOP section each answer came from, plus a document library sidebar and confidence indicator.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">Streamlit</span>
+          <span class="tech-tag">Custom CSS</span>
+          <span class="tech-tag">Session State</span>
+        </div>
+      </div>
+
+      <div class="component-card c5">
+        <div class="component-num">COMPONENT 05</div>
+        <div class="component-name">Analytics Dashboard</div>
+        <div class="component-desc">Tracks query volume, most-cited documents, unanswered questions, and response quality scores. Surfaces knowledge gaps where agents can't find answers — your WFM analytics DNA lives here.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">Streamlit Charts</span>
+          <span class="tech-tag">SQLite</span>
+          <span class="tech-tag">Pandas</span>
+          <span class="tech-tag">Power BI (optional)</span>
+        </div>
+      </div>
+
+      <div class="component-card c6">
+        <div class="component-num">COMPONENT 06</div>
+        <div class="component-name">Admin Panel</div>
+        <div class="component-desc">Upload new SOP documents, re-index the knowledge base, view document inventory, and manage chunking settings — without touching code. Makes the system self-serviceable.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">Streamlit File Uploader</span>
+          <span class="tech-tag">ChromaDB API</span>
+          <span class="tech-tag">Batch Embeddings</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Stack -->
+  <div class="section">
+    <div class="section-label">04 — Tech Stack</div>
+    <div class="section-title">Full Technology Stack</div>
+
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>LAYER</th>
+          <th>TOOL</th>
+          <th>WHY THIS CHOICE</th>
+          <th>COST</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="layer">Frontend</td>
+          <td class="tool">Streamlit</td>
+          <td class="reason">Fast to build, looks professional, easy to deploy. Rebuild in React later.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Backend</td>
+          <td class="tool">FastAPI + Python</td>
+          <td class="reason">You already know Python. FastAPI is production-grade and async-ready.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">AI Orchestration</td>
+          <td class="tool">LangChain</td>
+          <td class="reason">Industry standard for RAG pipelines. Every AI job posting lists it.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">LLM</td>
+          <td class="tool">OpenAI GPT-3.5-turbo</td>
+          <td class="reason">Cheap, fast, reliable. Entire project costs under $5 in API calls.</td>
+          <td class="cost">~$5 total</td>
+        </tr>
+        <tr>
+          <td class="layer">Embeddings</td>
+          <td class="tool">text-embedding-ada-002</td>
+          <td class="reason">Best price/performance for semantic search. Standard in production RAG.</td>
+          <td class="cost">~$1 total</td>
+        </tr>
+        <tr>
+          <td class="layer">Vector DB</td>
+          <td class="tool">ChromaDB</td>
+          <td class="reason">Runs locally, no setup, persists to disk. Perfect for a portfolio project.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Database</td>
+          <td class="tool">SQLite → PostgreSQL</td>
+          <td class="reason">SQLite for dev, Postgres for production. You already know SQL cold.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Deployment</td>
+          <td class="tool">Streamlit Cloud</td>
+          <td class="reason">One-click deploy from GitHub. Gives you a live shareable URL instantly.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Version Control</td>
+          <td class="tool">GitHub</td>
+          <td class="reason">Public repo is part of your portfolio. Commit history shows your process.</td>
+          <td class="cost">Free</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Folder Structure -->
+  <div class="section">
+    <div class="section-label">05 — Project Structure</div>
+    <div class="section-title">Repository Folder Structure</div>
+
+    <div class="folder-tree">
+      <div><span class="dir">cx-knowledge-assistant/</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── data/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── raw/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Original PDFs from CMS, CFPB</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── processed/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Chunked text ready for embedding</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── ingestion/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">loader.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># PDF/DOCX reader</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">chunker.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Text splitting logic</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── </span><span class="file">embedder.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Embedding + ChromaDB storage</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── rag/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">retriever.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Vector search logic</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">generator.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># LLM answer generation</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">memory.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Conversation buffer</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── </span><span class="file">prompts.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Prompt templates</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── api/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── </span><span class="file">main.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># FastAPI endpoints</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── ui/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">chat.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Main chat interface</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; ├── </span><span class="file">analytics.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Analytics dashboard</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── </span><span class="file">admin.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Document upload panel</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── db/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── </span><span class="file">logger.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Query logging to SQLite</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── chroma_db/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Persisted vector store (gitignored)</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── app.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Streamlit entry point</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── requirements.txt</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── .env</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># OPENAI_API_KEY (gitignored)</span></div>
+      <div>&nbsp;&nbsp;<span class="file">└── README.md</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Portfolio showcase README</span></div>
+    </div>
+  </div>
+
+  <!-- 6-Week Plan -->
+  <div class="section">
+    <div class="section-label">06 — Build Timeline</div>
+    <div class="section-title">6-Week Execution Plan</div>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="week-label">WEEK 01</div>
+        <div class="week-title">Data Collection + Ingestion Pipeline</div>
+        <ul class="week-tasks">
+          <li>Download 30–50 PDFs from cms.gov and cfpb.gov (Medicare handbooks, complaint handling guides)</li>
+          <li>Set up Python environment: pip install langchain chromadb openai streamlit pypdf2</li>
+          <li>Write loader.py, chunker.py, embedder.py</li>
+          <li>Run ingestion — verify ChromaDB stores chunks with metadata</li>
+          <li>Milestone: raw Python query returns relevant chunks from a test question</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 02</div>
+        <div class="week-title">RAG Core — Retrieval + Generation</div>
+        <ul class="week-tasks">
+          <li>Build retriever.py — semantic search returning top-5 chunks with source doc name + page</li>
+          <li>Build generator.py — GPT-3.5 prompt that answers ONLY from provided chunks</li>
+          <li>Write prompts.py — citation-enforcing system prompt</li>
+          <li>Test with 20+ real questions, tune chunk size and k-value</li>
+          <li>Milestone: Ask "what is the escalation process for a prior auth dispute?" and get a cited answer</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 03</div>
+        <div class="week-title">Conversational Memory + API Layer</div>
+        <ul class="week-tasks">
+          <li>Add ConversationBufferWindowMemory — maintain last 5 turns of context</li>
+          <li>Wrap everything in FastAPI endpoints: POST /query, GET /documents, POST /upload</li>
+          <li>Build db/logger.py — log every query, response, source, timestamp to SQLite</li>
+          <li>Milestone: Multi-turn conversation works; follow-up questions use prior context correctly</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 04</div>
+        <div class="week-title">Streamlit UI — Chat Interface</div>
+        <ul class="week-tasks">
+          <li>Build ui/chat.py — clean two-panel layout: chat on left, citations on right</li>
+          <li>Add document library sidebar showing all ingested SOPs</li>
+          <li>Add typing indicator, message timestamps, copy-to-clipboard on answers</li>
+          <li>Build ui/admin.py — drag-and-drop document upload, re-index button</li>
+          <li>Milestone: Someone with no technical knowledge can use the UI end-to-end</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 05</div>
+        <div class="week-title">Analytics Dashboard</div>
+        <ul class="week-tasks">
+          <li>Build ui/analytics.py — query volume by day, top 10 most-asked questions</li>
+          <li>Most cited documents chart — shows which SOPs get referenced most</li>
+          <li>Unanswered queries list — questions where confidence was low (your WFM instinct)</li>
+          <li>Response time distribution — system performance monitoring</li>
+          <li>Milestone: Dashboard tells a story about knowledge base health and agent behavior</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 06</div>
+        <div class="week-title">Deploy + Portfolio Polish</div>
+        <ul class="week-tasks">
+          <li>Deploy to Streamlit Cloud — get your live public URL</li>
+          <li>Write professional README with architecture diagram, demo GIF, setup instructions</li>
+          <li>Record 3-minute Loom demo video walking through a real healthcare call center scenario</li>
+          <li>Write your portfolio case study paragraph for LinkedIn and job applications</li>
+          <li>Milestone: Share live link in your NICE application cover letter</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Sources -->
+  <div class="section">
+    <div class="section-label">07 — Data Sources</div>
+    <div class="section-title">Where to Get Your SOP Data (All Free & Public)</div>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-step-num">01</div>
+        <div class="flow-step-content">
+          <div class="step-title">CMS Medicare & Medicaid Documentation</div>
+          <div class="step-desc">Member handbooks, prior authorization guides, complaint handling SOPs, and appeals processes. Exactly what a healthcare call center agent handles daily.</div>
+          <div class="step-tech">→ cms.gov/Medicare | ~20+ relevant PDFs</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">02</div>
+        <div class="flow-step-content">
+          <div class="step-title">CFPB Call Center & Complaint Handling Guides</div>
+          <div class="step-desc">Consumer Financial Protection Bureau has detailed agent guidance on complaint handling, escalation, and resolution timelines used in financial services call centers.</div>
+          <div class="step-tech">→ consumerfinance.gov | ~15+ relevant PDFs</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">03</div>
+        <div class="flow-step-content">
+          <div class="step-title">SSA Social Security Administration Guides</div>
+          <div class="step-desc">Public-facing agent guides for benefits inquiries, eligibility questions, and case status checks. Realistic government call center content.</div>
+          <div class="step-tech">→ ssa.gov/pubs | ~10+ relevant PDFs</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">04</div>
+        <div class="flow-step-content">
+          <div class="step-title">Create Realistic Synthetic SOPs</div>
+          <div class="step-desc">Use ChatGPT to generate 10-15 realistic fake SOPs for common call center processes — account verification, escalation procedures, refund policies. Label them clearly as synthetic.</div>
+          <div class="step-tech">→ Generated content | Adds realistic operational depth</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">CX Knowledge Assistant · System Design v1.0 · Rakshit Mathur</div>
+    <div class="footer-right">Built for NICE Cognigy / CCaaS AI roles</div>
+  </div>
+
+</div>
+</body>
+</html>

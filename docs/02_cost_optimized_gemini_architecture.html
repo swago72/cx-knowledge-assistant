@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CX Knowledge Assistant — System Design</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 64px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 40px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    font-family: 'Space Mono', monospace;
+    max-width: 600px;
+    line-height: 1.6;
+  }
+
+  /* Section titles */
+  .section {
+    margin-bottom: 56px;
+  }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .section-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 24px;
+  }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .arch-diagram::before {
+    content: 'SYSTEM ARCHITECTURE';
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--border);
+    letter-spacing: 3px;
+  }
+
+  .arch-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .arch-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .arch-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    min-width: 140px;
+    text-align: center;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .arch-node:hover {
+    border-color: var(--accent);
+  }
+
+  .arch-node .node-icon {
+    font-size: 22px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .arch-node .node-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .arch-node .node-tech {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .arch-node.accent { border-color: var(--accent); }
+  .arch-node.accent2 { border-color: var(--accent2); }
+  .arch-node.accent3 { border-color: var(--accent3); }
+  .arch-node.accent4 { border-color: var(--accent4); }
+
+  .arch-node.accent .node-icon { filter: drop-shadow(0 0 8px var(--accent)); }
+  .arch-node.accent2 .node-icon { filter: drop-shadow(0 0 8px var(--accent2)); }
+  .arch-node.accent3 .node-icon { filter: drop-shadow(0 0 8px var(--accent3)); }
+  .arch-node.accent4 .node-icon { filter: drop-shadow(0 0 8px var(--accent4)); }
+
+  .arch-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+    color: var(--muted);
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .arch-arrow .arrow-line {
+    width: 2px;
+    height: 30px;
+    background: linear-gradient(to bottom, var(--border), var(--accent));
+    position: relative;
+  }
+
+  .arch-arrow .arrow-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .arch-arrow-h {
+    width: 40px;
+    height: 2px;
+    background: linear-gradient(to right, var(--border), var(--accent));
+    flex-shrink: 0;
+  }
+
+  /* Components grid */
+  .components-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2px;
+    background: var(--border);
+  }
+
+  .component-card {
+    background: var(--surface);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .component-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+  }
+
+  .component-card.c1::before { background: var(--accent); }
+  .component-card.c2::before { background: var(--accent2); }
+  .component-card.c3::before { background: var(--accent3); }
+  .component-card.c4::before { background: var(--accent4); }
+  .component-card.c5::before { background: var(--danger); }
+  .component-card.c6::before { background: #ec4899; }
+
+  .component-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .component-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .component-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .tech-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tech-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .tech-tag.highlight {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Data flow */
+  .flow-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    background: var(--surface);
+    padding: 20px 24px;
+    border-left: 3px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .flow-step:hover {
+    border-color: var(--accent);
+  }
+
+  .flow-step-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--border);
+    min-width: 40px;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .flow-step:hover .flow-step-num {
+    color: var(--accent);
+  }
+
+  .flow-step-content .step-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .flow-step-content .step-desc {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    line-height: 1.6;
+  }
+
+  .flow-step-content .step-tech {
+    margin-top: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+  }
+
+  /* Stack table */
+  .stack-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+  }
+
+  .stack-table th {
+    text-align: left;
+    padding: 12px 16px;
+    color: var(--accent);
+    font-size: 10px;
+    letter-spacing: 2px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .stack-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .stack-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .stack-table tr:hover td {
+    background: var(--surface2);
+  }
+
+  .stack-table .layer {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .stack-table .tool {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .stack-table .reason {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .stack-table .cost {
+    color: var(--accent3);
+  }
+
+  /* Week timeline */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2), var(--accent3), var(--accent4), var(--accent), var(--accent2));
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 24px;
+    background: var(--surface);
+    padding: 20px 24px;
+  }
+
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 24px;
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    transform: rotate(45deg);
+  }
+
+  .week-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .week-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .week-tasks {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .week-tasks li {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding-left: 16px;
+    position: relative;
+    line-height: 1.5;
+  }
+
+  .week-tasks li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+
+  /* Folder structure */
+  .folder-tree {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    line-height: 2;
+  }
+
+  .folder-tree .dir { color: var(--accent); }
+  .folder-tree .file { color: var(--text); }
+  .folder-tree .comment { color: var(--muted); }
+
+  /* RAG flow visual */
+  .rag-visual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+  }
+
+  .rag-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .rag-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    text-align: center;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .rag-box.highlight {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .rag-box.highlight2 {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .rag-box.highlight3 {
+    border-color: var(--accent3);
+    color: var(--accent3);
+  }
+
+  .rag-arrow {
+    color: var(--muted);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: gap;
+    gap: 16px;
+  }
+
+  .footer-left {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .footer-right {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  @media (max-width: 600px) {
+    .arch-row { flex-direction: column; }
+    .rag-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="badge">Portfolio Project · System Design v2.0 — Simplified</div>
+    <h1>CX Knowledge <span>Assistant</span></h1>
+    <p class="subtitle">An AI-powered RAG system that lets call center agents query Google Play Store support docs using plain English — and get cited, accurate answers in real time. Built on Google Gemini + HuggingFace + ChromaDB.</p>
+  </div>
+
+  <!-- Architecture Overview -->
+  <div class="section">
+    <div class="section-label">01 — Architecture</div>
+    <div class="section-title">High-Level System Architecture</div>
+
+    <div class="arch-diagram">
+      <div class="arch-flow">
+
+        <!-- Layer 1: Data -->
+        <div class="arch-row">
+          <div class="arch-node accent3" style="min-width:200px;">
+            <span class="node-icon">🌐</span>
+            <div class="node-title">Google Play HTML Docs</div>
+            <div class="node-tech">Refunds · Billing · Installs · Payments · IAP</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">BeautifulSoup → LangChain Chunker</div>
+          <div class="arch-arrow-line"></div>
+        </div>
+
+        <!-- Layer 2: Ingestion -->
+        <div class="arch-row" style="gap:2px; justify-content:center;">
+          <div class="arch-node accent" style="min-width:160px;">
+            <span class="node-icon">🤗</span>
+            <div class="node-title">HuggingFace Embeddings</div>
+            <div class="node-tech">all-MiniLM-L6-v2 · Free · Local</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent" style="min-width:160px;">
+            <span class="node-icon">🗄️</span>
+            <div class="node-title">ChromaDB</div>
+            <div class="node-tech">Vector Store · Persisted locally</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">Semantic Search · LangChain RAG</div>
+          <div class="arch-arrow-line"></div>
+        </div>
+
+        <!-- Layer 3: RAG + LLM -->
+        <div class="arch-row" style="gap:2px; justify-content:center;">
+          <div class="arch-node accent2" style="min-width:160px;">
+            <span class="node-icon">🧠</span>
+            <div class="node-title">Gemini 2.0 Flash</div>
+            <div class="node-tech">Google AI Studio · Free API</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent2" style="min-width:160px;">
+            <span class="node-icon">💬</span>
+            <div class="node-title">Conversation Memory</div>
+            <div class="node-tech">LangChain BufferMemory</div>
+          </div>
+          <div class="arch-arrow-h"></div>
+          <div class="arch-node accent2" style="min-width:160px;">
+            <span class="node-icon">📊</span>
+            <div class="node-title">Query Logger</div>
+            <div class="node-tech">SQLite · analytics.py</div>
+          </div>
+        </div>
+
+        <div class="arch-arrow">
+          <div class="arch-arrow-line"></div>
+          <div class="arch-arrow-label">Cited Answer + Dashboard</div>
+          <div class="arch-arrow-line"></div>
+        </div>
+
+        <!-- Layer 4: UI -->
+        <div class="arch-row">
+          <div class="arch-node accent4" style="min-width:200px;">
+            <span class="node-icon">🖥️</span>
+            <div class="node-title">Streamlit App</div>
+            <div class="node-tech">Chat · Citations · Analytics · Admin Upload</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- RAG Flow -->
+  <div class="section">
+    <div class="section-label">02 — Core Logic</div>
+    <div class="section-title">RAG Pipeline — How a Query Flows</div>
+
+    <div class="rag-visual">
+      <div class="rag-row">
+        <div class="rag-box highlight">User Types Question</div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight">Embed Question<br><span style="font-size:9px;opacity:0.6">text-embedding-ada-002</span></div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight">Vector Search<br><span style="font-size:9px;opacity:0.6">ChromaDB cosine similarity</span></div>
+      </div>
+      <div class="rag-row" style="justify-content:flex-end;">
+        <div class="rag-arrow" style="transform:rotate(90deg);">→</div>
+      </div>
+      <div class="rag-row" style="flex-direction:row-reverse;">
+        <div class="rag-box highlight2">Return Answer + Citations</div>
+        <div class="rag-arrow">←</div>
+        <div class="rag-box highlight2">GPT-3.5 Generates Answer<br><span style="font-size:9px;opacity:0.6">constrained to retrieved chunks</span></div>
+        <div class="rag-arrow">←</div>
+        <div class="rag-box highlight2">Top 5 Chunks Retrieved<br><span style="font-size:9px;opacity:0.6">with source metadata</span></div>
+      </div>
+      <div class="rag-row" style="justify-content:flex-start;">
+        <div class="rag-arrow" style="transform:rotate(90deg);">→</div>
+      </div>
+      <div class="rag-row">
+        <div class="rag-box highlight3">Log Query to DB</div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight3">Update Analytics Dashboard</div>
+        <div class="rag-arrow">→</div>
+        <div class="rag-box highlight3">Surface Knowledge Gaps</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 Components -->
+  <div class="section">
+    <div class="section-label">03 — Components</div>
+    <div class="section-title">6 Core System Components</div>
+
+    <div class="components-grid">
+      <div class="component-card c1">
+        <div class="component-num">COMPONENT 01</div>
+        <div class="component-name">ingestion.py</div>
+        <div class="component-desc">Reads Google Play HTML files, strips nav/scripts with BeautifulSoup, chunks into 500-token segments, generates embeddings locally, and stores in ChromaDB with source metadata.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">BeautifulSoup4</span>
+          <span class="tech-tag highlight">LangChain</span>
+          <span class="tech-tag">sentence-transformers</span>
+          <span class="tech-tag">ChromaDB</span>
+        </div>
+      </div>
+
+      <div class="component-card c2">
+        <div class="component-num">COMPONENT 02</div>
+        <div class="component-name">rag.py</div>
+        <div class="component-desc">Embeds user questions with HuggingFace, performs cosine similarity search in ChromaDB, retrieves top-5 chunks, and passes them to Gemini with a citation-enforcing prompt.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">LangChain RAG</span>
+          <span class="tech-tag highlight">Gemini 2.0 Flash</span>
+          <span class="tech-tag">Prompt Engineering</span>
+          <span class="tech-tag">ConversationMemory</span>
+        </div>
+      </div>
+
+      <div class="component-card c3">
+        <div class="component-num">COMPONENT 03</div>
+        <div class="component-name">analytics.py</div>
+        <div class="component-desc">Logs every query, response, source citation, and timestamp to SQLite. Renders a dashboard showing query volume, top cited docs, unanswered questions, and knowledge gaps.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">SQLite</span>
+          <span class="tech-tag highlight">Pandas</span>
+          <span class="tech-tag">Streamlit Charts</span>
+        </div>
+      </div>
+
+      <div class="component-card c4">
+        <div class="component-num">COMPONENT 04</div>
+        <div class="component-name">app.py</div>
+        <div class="component-desc">Streamlit entry point. Two-panel chat UI with citations on the right. Document library sidebar, admin upload panel, and tab navigation between Chat and Analytics views.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">Streamlit</span>
+          <span class="tech-tag">Session State</span>
+          <span class="tech-tag">Custom CSS</span>
+        </div>
+      </div>
+
+      <div class="component-card c5">
+        <div class="component-num">COMPONENT 05</div>
+        <div class="component-name">.env</div>
+        <div class="component-desc">Single config file. Only one key needed — your free Google AI Studio API key. No OpenAI account, no credit card, no paid services required anywhere in the stack.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">GOOGLE_API_KEY</span>
+          <span class="tech-tag">python-dotenv</span>
+        </div>
+      </div>
+
+      <div class="component-card c6">
+        <div class="component-num">COMPONENT 06</div>
+        <div class="component-name">requirements.txt</div>
+        <div class="component-desc">9 packages total. Every one is a recognized industry keyword. Installs in under 2 minutes in Google Colab or locally. No version conflicts, no complex environment setup.</div>
+        <div class="tech-tags">
+          <span class="tech-tag highlight">langchain</span>
+          <span class="tech-tag highlight">langchain-google-genai</span>
+          <span class="tech-tag">chromadb</span>
+          <span class="tech-tag">sentence-transformers</span>
+          <span class="tech-tag">streamlit</span>
+          <span class="tech-tag">beautifulsoup4</span>
+          <span class="tech-tag">pandas</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Stack -->
+  <div class="section">
+    <div class="section-label">04 — Tech Stack</div>
+    <div class="section-title">Full Technology Stack</div>
+
+    <table class="stack-table">
+      <thead>
+        <tr>
+          <th>LAYER</th>
+          <th>TOOL</th>
+          <th>WHY THIS CHOICE</th>
+          <th>COST</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="layer">Frontend + App</td>
+          <td class="tool">Streamlit</td>
+          <td class="reason">Handles UI, routing, and state — replaces FastAPI entirely. One file runs everything.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">AI Orchestration</td>
+          <td class="tool">LangChain</td>
+          <td class="reason">Industry standard for RAG. Every AI/NLP job posting lists it. Handles memory too.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">LLM</td>
+          <td class="tool">Gemini 2.0 Flash</td>
+          <td class="reason">Free via Google AI Studio. 1M token context window. No credit card needed.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Embeddings</td>
+          <td class="tool">HuggingFace all-MiniLM-L6-v2</td>
+          <td class="reason">Runs 100% locally. Zero API cost. Production-grade quality. Open source credibility.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Vector DB</td>
+          <td class="tool">ChromaDB</td>
+          <td class="reason">Runs locally, persists to disk, zero setup. Industry-recognized vector store.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Document Parsing</td>
+          <td class="tool">BeautifulSoup4</td>
+          <td class="reason">Strips HTML cleanly. Handles Google Play support pages perfectly.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Analytics DB</td>
+          <td class="tool">SQLite + Pandas</td>
+          <td class="reason">Zero setup. Logs every query. Powers your analytics dashboard. You know SQL cold.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Dev Environment</td>
+          <td class="tool">Google Colab</td>
+          <td class="reason">Free GPU, runs in browser, saves to Google Drive. No local setup required.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Deployment</td>
+          <td class="tool">Streamlit Cloud</td>
+          <td class="reason">One-click deploy from GitHub. Live shareable URL for your resume and cover letter.</td>
+          <td class="cost">Free</td>
+        </tr>
+        <tr>
+          <td class="layer">Version Control</td>
+          <td class="tool">GitHub</td>
+          <td class="reason">Public repo is your portfolio. Commit history shows your build process to hiring managers.</td>
+          <td class="cost">Free</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Folder Structure -->
+  <div class="section">
+    <div class="section-label">05 — Project Structure</div>
+    <div class="section-title">Repository Folder Structure</div>
+
+    <div class="folder-tree">
+      <div><span class="dir">cx-knowledge-assistant/</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── data/</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="dir">│&nbsp;&nbsp; └── html/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Google Play support pages (.html)</span></div>
+      <div>&nbsp;&nbsp;<span class="dir">├── chroma_db/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Auto-created on first run (gitignored)</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── ingestion.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Load HTML → chunk → embed → ChromaDB</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── rag.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Retrieve chunks → Gemini → cited answer</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── analytics.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Log queries to SQLite + dashboard</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── app.py</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Streamlit entry point — all UI lives here</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── requirements.txt</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># 9 packages total</span></div>
+      <div>&nbsp;&nbsp;<span class="file">├── .env</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># GOOGLE_API_KEY only (gitignored)</span></div>
+      <div>&nbsp;&nbsp;<span class="file">└── README.md</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Portfolio showcase — architecture + demo link</span></div>
+    </div>
+  </div>
+
+  <!-- 6-Week Plan -->
+  <div class="section">
+    <div class="section-label">06 — Build Timeline</div>
+    <div class="section-title">6-Week Execution Plan</div>
+
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="week-label">WEEK 01</div>
+        <div class="week-title">Data Collection + ingestion.py</div>
+        <ul class="week-tasks">
+          <li>Save 14 Google Play support pages as HTML: refunds, billing, installs, payments, IAP</li>
+          <li>Set up environment: pip install langchain langchain-google-genai chromadb sentence-transformers streamlit beautifulsoup4 lxml pandas python-dotenv</li>
+          <li>Write ingestion.py — BeautifulSoup parser, LangChain chunker, HuggingFace embedder, ChromaDB storage</li>
+          <li>Run ingestion — verify ChromaDB stores chunks with source metadata</li>
+          <li>Milestone: Raw Python query returns relevant chunks from "how do I get a refund?"</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 02</div>
+        <div class="week-title">RAG Core — rag.py</div>
+        <ul class="week-tasks">
+          <li>Build retriever — HuggingFace embeds the question, ChromaDB returns top-5 chunks with source names</li>
+          <li>Build generator — Gemini answers ONLY from retrieved chunks, citations enforced in system prompt</li>
+          <li>Add ConversationBufferWindowMemory — last 5 turns of context maintained</li>
+          <li>Test with 20+ real Google Play support questions, tune chunk size and k-value</li>
+          <li>Milestone: "Why was I charged after cancelling?" returns a cited, accurate answer</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 03</div>
+        <div class="week-title">Analytics Layer — analytics.py</div>
+        <ul class="week-tasks">
+          <li>Build SQLite logger — log every query, answer, source doc, response time, timestamp</li>
+          <li>Build dashboard — query volume by day, top 10 questions, most cited docs, unanswered queries</li>
+          <li>Add knowledge gap detection — flag queries where no confident answer was found</li>
+          <li>Milestone: Dashboard shows a clear story about which docs get used most and where gaps exist</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 04</div>
+        <div class="week-title">Streamlit UI — app.py</div>
+        <ul class="week-tasks">
+          <li>Build two-panel chat layout: conversation on left, source citations on right</li>
+          <li>Add document library sidebar showing all 14 ingested HTML docs</li>
+          <li>Add admin upload tab — drag-and-drop new HTML files, re-index button</li>
+          <li>Wire analytics.py into a dedicated Analytics tab</li>
+          <li>Milestone: A non-technical person can use the full app end-to-end without help</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 05</div>
+        <div class="week-title">Polish + Testing</div>
+        <ul class="week-tasks">
+          <li>Add confidence scoring — low-confidence answers flagged visually in the UI</li>
+          <li>Edge case testing — irrelevant questions, empty results, very long queries</li>
+          <li>UI polish — loading spinners, copy-to-clipboard, timestamps, mobile responsiveness</li>
+          <li>Milestone: App handles gracefully anything a real support agent might throw at it</li>
+        </ul>
+      </div>
+
+      <div class="timeline-item">
+        <div class="week-label">WEEK 06</div>
+        <div class="week-title">Deploy + Portfolio Polish</div>
+        <ul class="week-tasks">
+          <li>Deploy to Streamlit Cloud — get your live public URL from GitHub in one click</li>
+          <li>Write professional README with architecture diagram, live demo link, setup instructions</li>
+          <li>Record 3-minute Loom demo: agent asks 5 real Google Play support questions end-to-end</li>
+          <li>Write portfolio case study paragraph for LinkedIn, resume, and NICE cover letter</li>
+          <li>Milestone: Live link ready to drop into job applications this week</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Sources -->
+  <div class="section">
+    <div class="section-label">07 — Data Sources</div>
+    <div class="section-title">Where to Get Your SOP Data (All Free & Public)</div>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-step-num">01</div>
+        <div class="flow-step-content">
+          <div class="step-title">Refunds & Chargebacks (3 pages)</div>
+          <div class="step-desc">Request a refund, Google Play refund policies, dispute a charge. Core of most agent interactions — agents need to know eligibility windows and escalation steps cold.</div>
+          <div class="step-tech">→ support.google.com/googleplay/answer/2479637 · 7659581 · 6220309</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">02</div>
+        <div class="flow-step-content">
+          <div class="step-title">Subscription Billing Issues (3 pages)</div>
+          <div class="step-desc">Manage subscriptions, cancel a subscription, subscription billing problems. Second most common contact driver in Play Store support — detailed policy content.</div>
+          <div class="step-tech">→ support.google.com/googleplay/answer/7018481 · 6098072 · 2851610</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">03</div>
+        <div class="flow-step-content">
+          <div class="step-title">App Download & Install Errors (3 pages)</div>
+          <div class="step-desc">Fix download errors, pending downloads, install error codes. Technical troubleshooting content — good for testing whether RAG retrieves the right error code steps.</div>
+          <div class="step-tech">→ support.google.com/googleplay/answer/7513003 · 1067233 · 2521768</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">04</div>
+        <div class="flow-step-content">
+          <div class="step-title">Payment Method Problems (3 pages)</div>
+          <div class="step-desc">Add a payment method, payment declined, payment troubleshooting. Overlaps with refunds — tests whether the RAG system correctly differentiates between similar topics.</div>
+          <div class="step-tech">→ support.google.com/googleplay/answer/4646404 · 3467931 · 6220309</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-num">05</div>
+        <div class="flow-step-content">
+          <div class="step-title">In-App Purchase Disputes (2 pages)</div>
+          <div class="step-desc">In-app purchases overview, unauthorized purchase handling. High-sensitivity topic — parents disputing children's purchases. Good for demonstrating nuanced retrieval in your demo.</div>
+          <div class="step-tech">→ support.google.com/googleplay/answer/1050566 · 2479637</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">CX Knowledge Assistant · System Design v2.0 · Rakshit Mathur</div>
+    <div class="footer-right">Google Gemini · HuggingFace · ChromaDB · Streamlit</div>
+  </div>
+
+</div>
+</body>
+</html>
