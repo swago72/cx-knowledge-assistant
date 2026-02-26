@@ -4,8 +4,6 @@ LLM-powered customer support assistant built with a production-oriented Retrieva
 
 This system ingests structured HTML knowledge base articles, builds a persistent vector store, retrieves semantically relevant content using embeddings, and generates strictly source-grounded responses with citation enforcement and fallback protection.
 
-## Architecture Overview
-
 ## System Design Evolution
 
 ### V1 — Enterprise Modular Architecture
@@ -31,6 +29,8 @@ Designed for enterprise CCaaS deployment.
 Designed for fast deployment + zero-cost scalability.
 
 [View Architecture v2](docs/02_cost_optimized_gemini_architecture.html)
+
+## Architecture Overview
 
 ## Ingestion Layer
 - HTML cleaning and normalization (BeautifulSoup)
