@@ -17,7 +17,8 @@ import pandas as pd
 # Config
 # -----------------------------
 from src.config import get_settings
-DEFAULT_DB_PATH = get_settings().analytics_db_path
+DEFAULT_DB_PATH = Path(os.getenv("ANALYTICS_DB_PATH", "data/analytics.db"))
+
 
 # Define a canonical "no answer" string so gap detection is consistent.
 NO_CONFIDENT_ANSWER = "couldn't find confident answer"
@@ -424,6 +425,112 @@ def milestone_report(
     }
 
 
+def containment_metrics(*, db_path: Union[str, Path] = DEFAULT_DB_PATH) -> Dict[str, Any]:
+    df = fetch_logs(db_path=db_path, limit=200000)
+    if df.empty or "extra" not in df.columns:
+        return {"total": 0, "containment_rate": 0, "clarify_rate": 0, "handoff_rate": 0}
+
+    states = df["extra"].apply(lambda x: x.get("state") if isinstance(x, dict) else None).dropna()
+
+    total = int(len(states))
+    if total == 0:
+        return {"total": 0, "containment_rate": 0, "clarify_rate": 0, "handoff_rate": 0}
+
+    answer = int((states == "ANSWER").sum())
+    clarify = int((states == "CLARIFY").sum())
+    handoff = int((states == "HANDOFF").sum())
+
+    return {
+        "total": total,
+        "containment_rate": round(answer / total, 3),
+        "clarify_rate": round(clarify / total, 3),
+        "handoff_rate": round(handoff / total, 3),
+    }
+
+def containment_by_intent(*, db_path: Union[str, Path] = DEFAULT_DB_PATH):
+    df = fetch_logs(db_path=db_path, limit=200000)
+    if df.empty or "extra" not in df.columns:
+        return pd.DataFrame()
+
+    df = df[df["extra"].notna()].copy()
+    df["intent"] = df["extra"].apply(lambda x: x.get("intent") if isinstance(x, dict) else None)
+    df["state"] = df["extra"].apply(lambda x: x.get("state") if isinstance(x, dict) else None)
+
+    df = df.dropna(subset=["intent", "state"])
+
+    out = (
+        df.groupby(["intent", "state"])
+        .size()
+        .reset_index(name="count")
+    )
+
+    return out.sort_values(["intent", "state"])
+
+
+def containment_rates_by_intent(*, db_path: Union[str, Path] = DEFAULT_DB_PATH) -> pd.DataFrame:
+    df = fetch_logs(db_path=db_path, limit=200000)
+    if df.empty or "extra" not in df.columns:
+        return pd.DataFrame()
+
+    df = df[df["extra"].notna()].copy()
+    df["intent"] = df["extra"].apply(lambda x: x.get("intent") if isinstance(x, dict) else None)
+    df["state"] = df["extra"].apply(lambda x: x.get("state") if isinstance(x, dict) else None)
+
+    df = df.dropna(subset=["intent", "state"])
+
+    counts = df.groupby(["intent", "state"]).size().reset_index(name="count")
+    totals = df.groupby("intent").size().reset_index(name="total")
+
+    out = counts.merge(totals, on="intent", how="left")
+    out["rate"] = (out["count"] / out["total"]).round(3)
+
+    return out.sort_values(["intent", "state"])
+
+
+
+def top_escalation_reasons(*, db_path: Union[str, Path] = DEFAULT_DB_PATH):
+    df = fetch_logs(db_path=db_path, limit=200000)
+    if df.empty or "extra" not in df.columns:
+        return pd.DataFrame()
+
+    df = df[df["extra"].notna()].copy()
+    df["state"] = df["extra"].apply(lambda x: x.get("state") if isinstance(x, dict) else None)
+    df["reason"] = df["extra"].apply(lambda x: x.get("decision_reason") if isinstance(x, dict) else None)
+
+    df = df[df["state"] == "HANDOFF"]
+
+    return (
+        df["reason"]
+        .value_counts()
+        .reset_index()
+        .rename(columns={"index": "reason", "reason": "count"})
+    )
+
+
+def workforce_impact(
+    avg_handle_time_minutes: float = 6.0,
+    cost_per_agent_hour: float = 25.0,
+    db_path=DEFAULT_DB_PATH,
+):
+    metrics = containment_metrics(db_path=db_path)
+    total = metrics.get("total", 0)
+    containment_rate = metrics.get("containment_rate", 0)
+
+    deflected = total * containment_rate
+    minutes_saved = deflected * avg_handle_time_minutes
+    hours_saved = minutes_saved / 60
+    cost_saved = hours_saved * cost_per_agent_hour
+
+    return {
+        "queries": total,
+        "containment_rate": containment_rate,
+        "deflected_queries": round(deflected, 2),
+        "hours_saved": round(hours_saved, 2),
+        "cost_saved_estimate": round(cost_saved, 2),
+    }
+
+
+
 if __name__ == "__main__":
     # Quick sanity check / local run:
     #   python -m src.analytics
@@ -438,23 +545,3 @@ if __name__ == "__main__":
 
 
 
-
-
-def containment_metrics(db_path=DEFAULT_DB_PATH):
-    df = fetch_logs(db_path=db_path, limit=200000)
-    if df.empty:
-        return {}
-
-    states = df["extra"].apply(lambda x: x.get("state") if isinstance(x, dict) else None)
-
-    total = len(states)
-    answer = (states == "ANSWER").sum()
-    clarify = (states == "CLARIFY").sum()
-    handoff = (states == "HANDOFF").sum()
-
-    return {
-        "total": total,
-        "containment_rate": round(answer / total, 3) if total else 0,
-        "clarify_rate": round(clarify / total, 3) if total else 0,
-        "handoff_rate": round(handoff / total, 3) if total else 0,
-    }
