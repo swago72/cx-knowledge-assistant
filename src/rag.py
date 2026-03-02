@@ -8,6 +8,7 @@ from src.config import get_settings
 from src.analytics import log_query, NO_CONFIDENT_ANSWER
 from src.dialogue.intent_router import detect_intent
 from src.dialogue.dialogue_policy import decide_state
+from src.policy_messages import build_policy_message
 
 
 # ============================================================
@@ -71,13 +72,15 @@ def retrieve(query: str, collection, embed_model, k: int = 5):
 
     hits = []
     for text, meta, dist in zip(docs, metas, dists):
-        hits.append({
-            "text": text,
-            "source": meta.get("source", ""),
-            "short_name": meta.get("short_name", meta.get("source", "")),
-            "chunk_num": meta.get("chunk_num"),
-            "distance": float(dist) if dist is not None else None,
-        })
+        hits.append(
+            {
+                "text": text,
+                "source": meta.get("source", ""),
+                "short_name": meta.get("short_name", meta.get("source", "")),
+                "chunk_num": meta.get("chunk_num"),
+                "distance": float(dist) if dist is not None else None,
+            }
+        )
     return hits
 
 
@@ -89,9 +92,7 @@ def build_prompt(question: str, hits: List[Dict[str, Any]], memory_text: str = "
     context_blocks = []
     for i, h in enumerate(hits, start=1):
         title = h["short_name"] or h["source"] or f"Doc {i}"
-        context_blocks.append(
-            f"[SOURCE {i}] Title: {title}\nText:\n{h['text']}"
-        )
+        context_blocks.append(f"[SOURCE {i}] Title: {title}\nText:\n{h['text']}")
 
     context = "\n\n".join(context_blocks)
 
@@ -130,15 +131,15 @@ SOURCES:
 # Generator
 # ============================================================
 
-settings = get_settings()
-
 def generate_answer(
     question: str,
     hits: List[Dict[str, Any]],
     memory_text: str = "",
     model_name: str = "models/gemini-2.5-pro",
     temperature: float = 0.2,
-):
+) -> str:
+    settings = get_settings()
+
     llm = ChatGoogleGenerativeAI(
         model=model_name,
         temperature=temperature,
@@ -166,7 +167,6 @@ def ask(
     min_hits: int = 1,
     debug: bool = False,
 ):
-
     if memory is None:
         memory = ChatMemory(max_turns=5)
 
@@ -178,9 +178,9 @@ def ask(
     # ----------------------------
     hits = retrieve(question, collection, embed_model, k=k)
 
-    dists = [h["distance"] for h in hits if h["distance"] is not None]
-    top_distance = min(dists) if dists else None
-    avg_distance = sum(dists) / len(dists) if dists else None
+    dists = [h["distance"] for h in hits if h.get("distance") is not None]
+    top_distance = float(min(dists)) if dists else None
+    avg_distance = float(sum(dists) / len(dists)) if dists else None
 
     retrieval_confidence = 1 - top_distance if top_distance is not None else 0.0
 
@@ -190,28 +190,32 @@ def ask(
     intent, intent_confidence = detect_intent(question)
 
     # ----------------------------
-    # Dialogue Decision
+    # Gate + Dialogue Decision
     # ----------------------------
     fallback_used = False
+    gate_reason = None
 
-    if not hits or len(hits) < min_hits:
+    if (not hits) or (len(hits) < min_hits):
         state, reason = "HANDOFF", "too_few_hits"
         fallback_used = True
-
+        gate_reason = "too_few_hits"
     elif top_distance is None or top_distance > max_distance:
         state, reason = "HANDOFF", "low_retrieval_confidence"
         fallback_used = True
-
+        gate_reason = "low_retrieval_confidence"
     else:
+        # decide_state uses BOTH intent_confidence and retrieval_confidence now
         state, reason = decide_state(
-            intent_confidence=intent_confidence,
-            retrieval_confidence=retrieval_confidence,
+            intent_confidence=float(intent_confidence),
+            retrieval_confidence=float(retrieval_confidence),
             fallback_used=False,
         )
 
     # ----------------------------
-    # Execute State
+    # Execute State (visible behavior)
     # ----------------------------
+    policy_message = build_policy_message(state, intent, reason)
+
     if state == "ANSWER":
         try:
             answer = generate_answer(
@@ -226,21 +230,32 @@ def ask(
             fallback_used = True
             state = "HANDOFF"
             reason = "llm_exception"
-
-    elif state == "CLARIFY":
-        answer = "Could you clarify your request so I can assist you better?"
+            policy_message = build_policy_message(state, intent, reason)
     else:
-        answer = NO_CONFIDENT_ANSWER
+        # CLARIFY / HANDOFF: show the policy message instead of a generic string
+        answer = policy_message or (NO_CONFIDENT_ANSWER if state == "HANDOFF" else "Could you clarify your request?")
 
     latency_ms = int((time.perf_counter() - start) * 1000)
 
     # ----------------------------
     # Logging
     # ----------------------------
+    sources_used = []
+    for h in hits:
+        t = h.get("short_name") or h.get("source")
+        if t:
+            sources_used.append(str(t))
+    sources_used = list(dict.fromkeys(sources_used))  # dedupe, preserve order
+
+    if debug:
+        print("\n[DEBUG] intent:", intent, "intent_conf:", intent_confidence)
+        print("[DEBUG] state:", state, "reason:", reason, "gate_reason:", gate_reason)
+        print("[DEBUG] top_distance:", top_distance, "retrieval_conf:", retrieval_confidence)
+
     log_query(
         user_question=question,
         answer=answer,
-        sources_used=[h["short_name"] for h in hits],
+        sources_used=sources_used,
         top_distance=top_distance,
         avg_distance=avg_distance,
         model_name=model_name,
@@ -248,11 +263,17 @@ def ask(
         fallback_used=fallback_used,
         extra={
             "k": k,
+            "temperature": temperature,
+            "min_hits": min_hits,
+            "max_distance": max_distance,
+            "num_hits": len(hits),
+            "gate_reason": gate_reason,
             "intent": intent,
-            "intent_confidence": intent_confidence,
-            "retrieval_confidence": retrieval_confidence,
+            "intent_confidence": float(intent_confidence),
+            "retrieval_confidence": float(retrieval_confidence),
             "state": state,
             "decision_reason": reason,
+            "policy_message": policy_message,
         },
     )
 
