@@ -46,7 +46,16 @@ def get_chroma_collection(
     chroma_path: str = "./chroma_db",
     collection_name: str = "cx_knowledge_base",
 ):
-    client = chromadb.PersistentClient(path=chroma_path)
+    os.makedirs(chroma_path, exist_ok=True)
+
+    try:
+        client = chromadb.PersistentClient(path=chroma_path)
+    except Exception as e:
+        # Chroma migration/config errors (like KeyError: '_type') → wipe and rebuild
+        shutil.rmtree(chroma_path, ignore_errors=True)
+        os.makedirs(chroma_path, exist_ok=True)
+        client = chromadb.PersistentClient(path=chroma_path)
+
     return client.get_or_create_collection(
         name=collection_name,
         metadata={"hnsw:space": "cosine"},
