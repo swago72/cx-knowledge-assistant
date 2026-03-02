@@ -29,7 +29,7 @@ __pycache__/
 # =========================
 # Chroma Vector DB
 # =========================
-chroma_db/
+# chroma_db/   # <-- allow ChromaDB for Streamlit demo
 
 # =========================
 # SQLite Analytics DB

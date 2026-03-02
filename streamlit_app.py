@@ -26,6 +26,14 @@ def _load_collection():
     return get_chroma_collection()
 
 
+
+
+collection = _load_collection()
+st.caption(f"Chroma path exists: {__import__('os').path.exists('chroma_db')}")
+st.caption(f"Chroma collections count: {collection.count()}")
+
+
+
 # -----------------------------
 # Header
 # -----------------------------
