@@ -7,6 +7,8 @@ import re
 import hashlib
 from typing import List, Dict, Tuple, Optional
 
+from src.config import get_settings
+
 
 # ----------------------------
 # IDs (avoid collisions)
@@ -198,12 +200,14 @@ def embed_and_store(
 # Main
 # ----------------------------
 def main():
+    settings = get_settings()
+
     print("=" * 55)
     print("  CX Knowledge Assistant — Ingestion Pipeline")
     print("=" * 55 + "\n")
 
     print("STEP 1: Loading HTML files...")
-    documents = load_html_files(folder_path="data/html")
+    documents = load_html_files(folder_path=str(settings.html_dir))
 
     if not documents:
         print("\n⚠ No documents loaded. Add .html files to data/html and rerun.")
@@ -216,8 +220,8 @@ def main():
     # Set reset_collection=True if you want a clean rebuild during debugging
     embed_and_store(
         chunks,
-        collection_name="cx_knowledge_base",
-        chroma_path="./chroma_db",
+        collection_name=settings.collection_name,
+        chroma_path=str(settings.chroma_path),
         reset_collection=False,
         batch_size=64,
     )

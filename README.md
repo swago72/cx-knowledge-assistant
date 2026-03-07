@@ -67,7 +67,16 @@ Designed for fast deployment + zero-cost scalability.
     # Create .env Add GOOGLE_API_KEY
     python -m src/ingestion
     python -m src/run_one
-    streamlit run app.py
+    streamlit run streamlit_app.py
+
+## Streamlit Cloud deployment notes
+- `chroma_db/` should remain gitignored and **not committed**. The app now auto-recovers from missing/corrupt/incompatible Chroma state and rebuilds from `data/html` when needed.
+- Set `GOOGLE_API_KEY` in Streamlit secrets for LLM answers. If absent, the app still boots, retrieval/indexing works, and chat returns a graceful fallback message.
+- Optional secrets/env overrides:
+  - `CHROMA_PATH` (default: `chroma_db`)
+  - `CHROMA_COLLECTION` (default: `cx_knowledge_base`)
+  - `HTML_DIR` (default: `data/html`)
+  - `ANALYTICS_DB_PATH` (default: `data/analytics.db`)
 
 ## Status
 - [x] Week 1: Ingestion pipeline

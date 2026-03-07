@@ -2,7 +2,8 @@ import pandas as pd
 import streamlit as st
 from sentence_transformers import SentenceTransformer
 
-from src.rag import get_chroma_collection, ask, ChatMemory
+from src.config import get_settings
+from src.rag import get_chroma_collection, ask, ChatMemory, bootstrap_collection_if_needed
 from src.analytics import (
     fetch_logs,
     containment_metrics,
@@ -11,6 +12,8 @@ from src.analytics import (
 )
 
 st.set_page_config(page_title="CX Knowledge Assistant — Optimization Dashboard", layout="wide")
+
+settings = get_settings()
 
 
 # -----------------------------
@@ -23,14 +26,27 @@ def _load_embed_model():
 
 @st.cache_resource
 def _load_collection():
-    return get_chroma_collection()
+    collection = get_chroma_collection(
+        chroma_path=str(settings.chroma_path),
+        collection_name=settings.collection_name,
+    )
+    collection, rebuilt = bootstrap_collection_if_needed(collection)
+    return collection, rebuilt
 
 
 
 
-collection = _load_collection()
-st.caption(f"Chroma path exists: {__import__('os').path.exists('chroma_db')}")
-st.caption(f"Chroma collections count: {collection.count()}")
+collection, rebuilt_on_start = _load_collection()
+st.caption(f"Chroma path: {settings.chroma_path}")
+st.caption(f"Chroma chunks: {collection.count()}")
+if rebuilt_on_start:
+    st.info("Knowledge base was missing/empty and has been rebuilt from local HTML docs.")
+
+if not settings.google_api_key:
+    st.warning(
+        "GOOGLE_API_KEY is missing. Retrieval and dashboard will still work, "
+        "but answers requiring the LLM will return a fallback response."
+    )
 
 
 
@@ -96,7 +112,7 @@ with tab_chat:
             st.write(user_q)
 
         embed_model = _load_embed_model()
-        collection = _load_collection()
+        collection, _ = _load_collection()
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):

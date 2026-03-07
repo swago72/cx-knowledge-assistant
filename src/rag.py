@@ -1,4 +1,7 @@
+import os
+import shutil
 import time
+from pathlib import Path
 from typing import List, Dict, Any
 
 import chromadb
@@ -9,6 +12,7 @@ from src.analytics import log_query, NO_CONFIDENT_ANSWER
 from src.dialogue.intent_router import detect_intent
 from src.dialogue.dialogue_policy import decide_state
 from src.policy_messages import build_policy_message
+from src.ingestion import load_html_files, chunk_documents, embed_and_store
 
 
 # ============================================================
@@ -46,20 +50,64 @@ def get_chroma_collection(
     chroma_path: str = "./chroma_db",
     collection_name: str = "cx_knowledge_base",
 ):
-    os.makedirs(chroma_path, exist_ok=True)
+    path = Path(chroma_path)
+    if path.exists() and not path.is_dir():
+        path.unlink(missing_ok=True)
+    path.mkdir(parents=True, exist_ok=True)
+
+    def _connect_client() -> Any:
+        return chromadb.PersistentClient(path=str(path))
 
     try:
-        client = chromadb.PersistentClient(path=chroma_path)
-    except Exception as e:
-        # Chroma migration/config errors (like KeyError: '_type') → wipe and rebuild
-        shutil.rmtree(chroma_path, ignore_errors=True)
-        os.makedirs(chroma_path, exist_ok=True)
-        client = chromadb.PersistentClient(path=chroma_path)
+        client = _connect_client()
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        _ = collection.count()  # force load; catches stale/corrupt local DB early
+        return collection
+    except Exception:
+        # Handle stale/corrupt/incompatible persisted data (e.g., KeyError: '_type').
+        shutil.rmtree(path, ignore_errors=True)
+        path.mkdir(parents=True, exist_ok=True)
+        client = _connect_client()
+        return client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
 
-    return client.get_or_create_collection(
-        name=collection_name,
-        metadata={"hnsw:space": "cosine"},
+
+def bootstrap_collection_if_needed(collection, min_count: int = 1) -> tuple[Any, bool]:
+    """
+    Ensures the knowledge base is usable on first run.
+    Rebuilds from local HTML docs if collection is empty.
+    Returns (collection, rebuilt_flag).
+    """
+    try:
+        current_count = int(collection.count())
+    except Exception:
+        current_count = 0
+
+    if current_count >= min_count:
+        return collection, False
+
+    settings = get_settings()
+    documents = load_html_files(folder_path=str(settings.html_dir))
+    if not documents:
+        return collection, False
+
+    chunks = chunk_documents(documents, chunk_size=500, chunk_overlap=50)
+    if not chunks:
+        return collection, False
+
+    rebuilt_collection, _ = embed_and_store(
+        chunks,
+        collection_name=settings.collection_name,
+        chroma_path=str(settings.chroma_path),
+        reset_collection=False,
+        batch_size=64,
     )
+    return rebuilt_collection, True
 
 
 # ============================================================
@@ -148,6 +196,8 @@ def generate_answer(
     temperature: float = 0.2,
 ) -> str:
     settings = get_settings()
+    if not settings.google_api_key:
+        raise RuntimeError("Missing GOOGLE_API_KEY")
 
     llm = ChatGoogleGenerativeAI(
         model=model_name,
@@ -235,7 +285,10 @@ def ask(
                 temperature=temperature,
             )
         except Exception:
-            answer = NO_CONFIDENT_ANSWER
+            answer = (
+                "I can't access the language model right now. "
+                "Please add GOOGLE_API_KEY in Streamlit secrets or try again later."
+            )
             fallback_used = True
             state = "HANDOFF"
             reason = "llm_exception"
