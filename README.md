@@ -1,78 +1,115 @@
-# CX Knowledge Assistant — Production-Safe RAG System
+# CX Knowledge Assistant — Production-Safe RAG + Analytics Demo
 
-LLM-powered customer support assistant built with a production-oriented Retrieval-Augmented Generation (RAG) architecture.
+An LLM-powered customer support knowledge assistant built with a production-oriented Retrieval-Augmented Generation (RAG) architecture and an embedded analytics dashboard.
 
-This system ingests structured HTML knowledge base articles, builds a persistent vector store, retrieves semantically relevant content using embeddings, and generates strictly source-grounded responses with citation enforcement and fallback protection.
+The system ingests HTML knowledge base articles, chunks and embeds them, stores them in ChromaDB, retrieves semantically relevant content, and generates source-grounded responses with fallback protection. It also logs query telemetry to power containment, escalation, and knowledge-gap analytics in Streamlit.
+
+## What This Project Demonstrates
+
+- Source-grounded customer support Q&A
+- Retrieval-Augmented Generation (RAG)
+- Semantic search with SentenceTransformers + ChromaDB
+- Dialogue policy with ANSWER / CLARIFY / HANDOFF states
+- Query logging and telemetry analytics
+- Knowledge-gap detection
+- Workforce impact simulation
+- Streamlit deployment
 
 ## System Design Evolution
 
 ### V1 — Enterprise Modular Architecture
 - FastAPI backend
-- OpenAI GPT-3.5
-- LangChain RAG
-- SQLite → PostgreSQL upgrade path
-- Full ingestion + analytics layer
+- OpenAI GPT-based RAG design
+- SQLite with PostgreSQL upgrade path
+- Dedicated ingestion + analytics layer
 
-Designed for enterprise CCaaS deployment.
+Designed as an enterprise-ready foundation for CCaaS-style deployment.
 
 [View Architecture v1](docs/01_mvp_enterprise_architecture.html)
 
 ---
 
 ### V2 — Simplified Cost-Optimized Stack
-- Gemini 2.0 Flash (Free tier)
-- HuggingFace local embeddings
-- No FastAPI layer
-- Fully Streamlit-based app
-- Reduced infra complexity
+- Streamlit-based application
+- Google Gemini via LangChain
+- Local HuggingFace embeddings
+- ChromaDB vector store
+- SQLite telemetry and analytics
+- Lower infrastructure complexity for fast deployment
 
-Designed for fast deployment + zero-cost scalability.
+Designed as a lightweight, deployable, portfolio-ready AI support operations demo.
 
 [View Architecture v2](docs/02_cost_optimized_gemini_architecture.html)
 
 ## Architecture Overview
 
-## Ingestion Layer
-- HTML cleaning and normalization (BeautifulSoup)
-- Recursive chunking (500 token windows with overlap)
-- SentenceTransformer embeddings (all-MiniLM-L6-v2)
-- Persistent ChromaDB vector storage
-## Retrieval Layer
-- Cosine similarity search with distance diagnostics 
-- Top-k retrieval with metadata tracking
-- Debug metrics (distance, hit previews, chunk counts)
-## Generation Layer
-- Gemini 2.5 Pro (via LangChain)
-- Strict source-only answering
-- Citation enforcement
-- Confidence-based fallback logic
-## Analytics Layer (WIP)
+### Ingestion Layer
+- HTML cleaning and normalization with BeautifulSoup
+- Recursive chunking with overlap
+- SentenceTransformer embeddings using `all-MiniLM-L6-v2`
+- ChromaDB knowledge base creation from `data/html`
+
+### Retrieval Layer
+- Cosine similarity search over embedded chunks
+- Top-k retrieval with metadata and distance tracking
+- Retrieval confidence diagnostics
+
+### Dialogue + Response Layer
+- Intent routing
+- Dialogue decision policy:
+  - `ANSWER`
+  - `CLARIFY`
+  - `HANDOFF`
+- Gemini-based answer generation
+- Strict source-grounded prompting
+- Fallback behavior for weak retrieval
+
+### Analytics Layer
 - SQLite query logging
-- Latency tracking
-- Similarity scoring
+- Containment metrics
+- Daily query volume
+- Escalation reason tracking
+- Knowledge-gap detection
+- Workforce impact simulation dashboard
 
+## Tech Stack
 
-## Stack
 - Python 3.11
-- LLM: Google Gemini (via LangChain)
-- Sentence Transformers
+- Streamlit
+- Google Gemini (via LangChain)
+- SentenceTransformers
 - ChromaDB
 - BeautifulSoup
 - SQLite
-- UI: Streamlit
+- Pandas
 
+## Project Structure
+
+```text
+cx-knowledge-assistant/
+├── streamlit_app.py
+├── requirements.txt
+├── data/
+│   └── html/
+├── src/
+│   ├── analytics.py
+│   ├── config.py
+│   ├── ingestion.py
+│   ├── rag.py
+│   └── dialogue/
+└── docs/
+```
 
 ## Setup
     pip install -r requirements.txt
     # Create .env Add GOOGLE_API_KEY
-    python -m src/ingestion
-    python -m src/run_one
-    streamlit run app.py
+    streamlit run streamlit_app.py
 
 ## Status
-- [x] Week 1: Ingestion pipeline
-- [x] Week 2: RAG + Gemini
-- [ ] Week 3: Analytics
-- [ ] Week 4: Streamlit UI
-- [ ] Week 5: Polish
-- [ ] Week 6: Deploy
+- [x] Step 1: Ingestion pipeline
+- [x] Step 2: RAG + response generation
+- [x] Step 3: Dialogue policy and fallback logic
+- [x] Step 4: Telemetry logging
+- [x] Step 5: Streamlit analytics dashboard
+- [x] Step 6: Deploy
+- [ ] Week 6: Polish
