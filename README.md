@@ -112,4 +112,4 @@ cx-knowledge-assistant/
 - [x] Step 4: Telemetry logging
 - [x] Step 5: Streamlit analytics dashboard
 - [x] Step 6: Deploy
-- [ ] Week 6: Polish
+- [ ] Step 7: Polish
