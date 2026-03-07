@@ -15,6 +15,10 @@ The system ingests HTML knowledge base articles, chunks and embeds them, stores 
 - Workforce impact simulation
 - Streamlit deployment
 
+## Architecture Diagram
+
+![CX Knowledge Assistant Architecture](docs/architecture_diagram.png)
+
 ## System Design Evolution
 
 ### V1 — Enterprise Modular Architecture
