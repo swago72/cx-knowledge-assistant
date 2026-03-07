@@ -17,7 +17,9 @@ The system ingests HTML knowledge base articles, chunks and embeds them, stores 
 
 ## Architecture Diagram
 
-![CX Knowledge Assistant Architecture](docs/architecture_diagram.png)
+<p align="center">
+  <img src="docs/architecture_diagram.png" width="850">
+</p>
 
 ## System Design Evolution
 
