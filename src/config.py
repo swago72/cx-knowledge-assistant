@@ -14,13 +14,14 @@ load_dotenv()
 @dataclass(frozen=True)
 class Settings:
     # Required
-    google_api_key: str
+    google_api_key: str = ""
 
     # Optional (defaults match your current code)
-    chroma_path: str = "./chroma_db"
+    chroma_path: Path = Path("chroma_db")
     collection_name: str = "cx_knowledge_base"
-    html_dir: str = "data/html"
+    html_dir: Path = Path("data") / "html"
     analytics_db_path: Path = Path("data") / "analytics.db"
+    base_dir: Path = Path(__file__).resolve().parent.parent
 
     # RAG defaults
     model_name: str = "models/gemini-2.5-pro"
@@ -32,22 +33,26 @@ class Settings:
 
 def get_settings() -> Settings:
     """
-    Single source of truth for config. Fails fast if required values are missing.
-    Allows overrides via .env while keeping safe defaults.
+    Single source of truth for config with safe defaults for Streamlit Cloud.
+    GOOGLE_API_KEY may be empty; callers that require LLM access should validate it.
     """
     key = os.getenv("GOOGLE_API_KEY", "").strip()
-    if not key:
-        raise RuntimeError(
-            "Missing GOOGLE_API_KEY.\n"
-            "Fix:\n"
-            "1) Copy .env.example -> .env\n"
-            "2) Put your key in GOOGLE_API_KEY=...\n"
-        )
 
-    chroma_path = os.getenv("CHROMA_PATH", "./chroma_db")
+    base_dir = Path(__file__).resolve().parent.parent
+
+    chroma_path = Path(os.getenv("CHROMA_PATH", "chroma_db"))
+    if not chroma_path.is_absolute():
+        chroma_path = base_dir / chroma_path
+
     collection = os.getenv("CHROMA_COLLECTION", "cx_knowledge_base")
-    html_dir = os.getenv("HTML_DIR", "data/html")
-    db_path = os.getenv("ANALYTICS_DB_PATH", "data/analytics.db")
+
+    html_dir = Path(os.getenv("HTML_DIR", "data/html"))
+    if not html_dir.is_absolute():
+        html_dir = base_dir / html_dir
+
+    db_path = Path(os.getenv("ANALYTICS_DB_PATH", "data/analytics.db"))
+    if not db_path.is_absolute():
+        db_path = base_dir / db_path
 
     # Optional overrides for tuning
     model_name = os.getenv("MODEL_NAME", "models/gemini-2.5-pro")
@@ -62,6 +67,7 @@ def get_settings() -> Settings:
         collection_name=collection,
         html_dir=html_dir,
         analytics_db_path=Path(db_path),
+        base_dir=base_dir,
         model_name=model_name,
         temperature=temperature,
         k=k,
