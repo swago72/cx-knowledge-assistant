@@ -1,3 +1,5 @@
+import os
+import shutil
 import time
 from typing import List, Dict, Any
 
@@ -9,6 +11,7 @@ from src.analytics import log_query, NO_CONFIDENT_ANSWER
 from src.dialogue.intent_router import detect_intent
 from src.dialogue.dialogue_policy import decide_state
 from src.policy_messages import build_policy_message
+from src.ingestion import load_html_files, chunk_documents, embed_and_store
 
 
 # ============================================================
@@ -43,23 +46,73 @@ class ChatMemory:
 # ============================================================
 
 def get_chroma_collection(
-    chroma_path: str = "./chroma_db",
-    collection_name: str = "cx_knowledge_base",
+    chroma_path: str | None = None,
+    collection_name: str | None = None,
 ):
+    settings = get_settings()
+    chroma_path = chroma_path or settings.chroma_path
+    collection_name = collection_name or settings.collection_name
+
     os.makedirs(chroma_path, exist_ok=True)
 
     try:
         client = chromadb.PersistentClient(path=chroma_path)
-    except Exception as e:
-        # Chroma migration/config errors (like KeyError: '_type') → wipe and rebuild
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        return collection
+    except Exception:
+        # Covers corruption / migration issues like KeyError: '_type'
         shutil.rmtree(chroma_path, ignore_errors=True)
         os.makedirs(chroma_path, exist_ok=True)
-        client = chromadb.PersistentClient(path=chroma_path)
 
-    return client.get_or_create_collection(
-        name=collection_name,
-        metadata={"hnsw:space": "cosine"},
+        client = chromadb.PersistentClient(path=chroma_path)
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            metadata={"hnsw:space": "cosine"},
+        )
+        return collection
+
+
+def ensure_knowledge_base():
+    """
+    Returns a usable Chroma collection.
+    If collection is empty or missing, rebuild it from HTML files.
+    """
+    settings = get_settings()
+
+    collection = get_chroma_collection(
+        chroma_path=settings.chroma_path,
+        collection_name=settings.collection_name,
     )
+
+    try:
+        current_count = collection.count()
+    except Exception:
+        current_count = 0
+
+    if current_count > 0:
+        return collection
+
+    documents = load_html_files(folder_path=settings.html_dir)
+    if not documents:
+        raise RuntimeError(
+            f"No HTML files found in {settings.html_dir}. "
+            "Add knowledge-base HTML files and redeploy."
+        )
+
+    chunks = chunk_documents(documents, chunk_size=500, chunk_overlap=50)
+
+    collection, _ = embed_and_store(
+        chunks,
+        collection_name=settings.collection_name,
+        chroma_path=settings.chroma_path,
+        reset_collection=False,
+        batch_size=64,
+    )
+
+    return collection
 
 
 # ============================================================
@@ -182,9 +235,6 @@ def ask(
     start = time.perf_counter()
     memory.add_user(question)
 
-    # ----------------------------
-    # Retrieval
-    # ----------------------------
     hits = retrieve(question, collection, embed_model, k=k)
 
     dists = [h["distance"] for h in hits if h.get("distance") is not None]
@@ -193,14 +243,8 @@ def ask(
 
     retrieval_confidence = 1 - top_distance if top_distance is not None else 0.0
 
-    # ----------------------------
-    # Intent Detection
-    # ----------------------------
     intent, intent_confidence = detect_intent(question)
 
-    # ----------------------------
-    # Gate + Dialogue Decision
-    # ----------------------------
     fallback_used = False
     gate_reason = None
 
@@ -213,16 +257,12 @@ def ask(
         fallback_used = True
         gate_reason = "low_retrieval_confidence"
     else:
-        # decide_state uses BOTH intent_confidence and retrieval_confidence now
         state, reason = decide_state(
             intent_confidence=float(intent_confidence),
             retrieval_confidence=float(retrieval_confidence),
             fallback_used=False,
         )
 
-    # ----------------------------
-    # Execute State (visible behavior)
-    # ----------------------------
     policy_message = build_policy_message(state, intent, reason)
 
     if state == "ANSWER":
@@ -241,20 +281,16 @@ def ask(
             reason = "llm_exception"
             policy_message = build_policy_message(state, intent, reason)
     else:
-        # CLARIFY / HANDOFF: show the policy message instead of a generic string
         answer = policy_message or (NO_CONFIDENT_ANSWER if state == "HANDOFF" else "Could you clarify your request?")
 
     latency_ms = int((time.perf_counter() - start) * 1000)
 
-    # ----------------------------
-    # Logging
-    # ----------------------------
     sources_used = []
     for h in hits:
         t = h.get("short_name") or h.get("source")
         if t:
             sources_used.append(str(t))
-    sources_used = list(dict.fromkeys(sources_used))  # dedupe, preserve order
+    sources_used = list(dict.fromkeys(sources_used))
 
     if debug:
         print("\n[DEBUG] intent:", intent, "intent_conf:", intent_confidence)
