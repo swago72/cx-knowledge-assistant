@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from sentence_transformers import SentenceTransformer
 
-from src.rag import get_chroma_collection, ask, ChatMemory
+from src.rag import ensure_knowledge_base, ask, ChatMemory
 from src.analytics import (
     fetch_logs,
     containment_metrics,
@@ -23,14 +23,13 @@ def _load_embed_model():
 
 @st.cache_resource
 def _load_collection():
-    return get_chroma_collection()
+    return ensure_knowledge_base()
 
 
 
 
 collection = _load_collection()
-st.caption(f"Chroma path exists: {__import__('os').path.exists('chroma_db')}")
-st.caption(f"Chroma collections count: {collection.count()}")
+st.caption(f"Knowledge base chunks loaded: {collection.count()}")
 
 
 
